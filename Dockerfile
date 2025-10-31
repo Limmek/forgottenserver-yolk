@@ -22,6 +22,7 @@ RUN apt install -y \
     libssl-dev libcurl4-gnutls-dev liblua5.1-0-dev libluajit-5.1-dev \
     libevent-dev libmariadb-dev libicu-dev libjsoncpp-dev \
     libboost-system-dev libboost-iostreams-dev libpugixml-dev \
+    libmysqlclient-dev libboost-locale-dev libboost-date-time-dev libboost-json-dev \
     libcrypto++-dev libfmt-dev libncurses-dev
 
 # Install additional libraries (some may not be available in Ubuntu 24.04)
