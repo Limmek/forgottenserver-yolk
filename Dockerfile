@@ -17,12 +17,12 @@ RUN apt update && apt install -y \
     sqlite3 libsqlite3-dev locales ffmpeg bzip2 zlib1g-dev tini \
     cmake build-essential
 
-# Install development libraries
+# Install required libraries
 RUN apt install -y \
     libssl-dev libcurl4-gnutls-dev liblua5.1-0-dev libluajit-5.1-dev \
     libevent-dev libmariadb-dev libicu-dev libjsoncpp-dev \
     libboost-system-dev libboost-iostreams-dev libpugixml-dev \
-    libmysqlclient-dev libboost-locale-dev libboost-date-time-dev libboost-json-dev \
+    libboost-locale-dev libboost-date-time-dev libboost-json-dev \
     libcrypto++-dev libfmt-dev libncurses-dev
 
 # Install additional libraries (some may not be available in Ubuntu 24.04)
