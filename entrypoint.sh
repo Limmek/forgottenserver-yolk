@@ -110,7 +110,8 @@ if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
         rm -rf build
         mkdir -p build
         cd build
-        cmake .. -DLUA_INCLUDE_DIR=/usr/include/luajit-2.1 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/libluajit-5.1.so
+        if [ "${BUILD:-0}" = "1" ]; then BUILD_TYPE="Debug"; else BUILD_TYPE="Release"; fi
+        cmake .. -DLUA_INCLUDE_DIR=/usr/include/luajit-2.1 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/libluajit-5.1.so -D CMAKE_BUILD_TYPE=${BUILD_TYPE}
         make
         
         # Move TFS if it was built and make it executable
