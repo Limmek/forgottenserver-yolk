@@ -5,6 +5,24 @@ cd /home/container
 INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
 export INTERNAL_IP
 
+backup_existing_config() {
+    local backup_dir=""
+    if [ -f config.lua ]; then
+        backup_dir=$(mktemp -d)
+        cp config.lua "${backup_dir}/config.lua"
+    fi
+    echo "${backup_dir}"
+}
+
+restore_existing_config() {
+    local backup_dir="$1"
+    if [ -n "${backup_dir}" ] && [ -f "${backup_dir}/config.lua" ]; then
+        cp "${backup_dir}/config.lua" config.lua
+        echo "Preserved existing config.lua"
+        rm -rf "${backup_dir}"
+    fi
+}
+
 if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then 
     echo "Auto-update is enabled. Checking for updates..."
     
@@ -63,23 +81,26 @@ if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
             else
                 echo "Repository origin mismatch. Expected: ${GIT_ADDRESS}, Found: ${ORIGIN}"
                 echo "Removing existing repository and re-cloning..."
-                rm -rf .git
-                rm -rf *
+                backup_dir=$(backup_existing_config)
+                find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
                 git clone --recursive --single-branch --branch ${BRANCH} ${GIT_ADDRESS} .
+                restore_existing_config "${backup_dir}"
                 should_rebuild=true
             fi
         else
             echo "Invalid git repository found. Re-cloning..."
-            rm -rf .git
-            rm -rf *
+            backup_dir=$(backup_existing_config)
+            find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
             git clone --recursive --single-branch --branch ${BRANCH} ${GIT_ADDRESS} .
+            restore_existing_config "${backup_dir}"
             should_rebuild=true
         fi
     else
         echo "No git repository found. Cloning TFS source code..."
-        # Clean any existing files that might interfere (except entrypoint.sh)
-        find . -maxdepth 1 ! -name 'entrypoint.sh' ! -name '.' -exec rm -rf {} +
+        backup_dir=$(backup_existing_config)
+        find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
         git clone --recursive --single-branch --branch ${BRANCH} ${GIT_ADDRESS} .
+        restore_existing_config "${backup_dir}"
         should_rebuild=true
     fi
     

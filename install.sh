@@ -5,6 +5,24 @@ set -euo pipefail
 # It fetches the Forgotten Server sources, rebuilds when necessary, and
 # ensures configuration files remain intact under /mnt/server.
 
+backup_existing_config() {
+    local backup_dir=""
+    if [ -f config.lua ]; then
+        backup_dir=$(mktemp -d)
+        cp config.lua "${backup_dir}/config.lua"
+    fi
+    echo "${backup_dir}"
+}
+
+restore_existing_config() {
+    local backup_dir="$1"
+    if [ -n "${backup_dir}" ] && [ -f "${backup_dir}/config.lua" ]; then
+        cp "${backup_dir}/config.lua" config.lua
+        echo "Preserved existing config.lua"
+        rm -rf "${backup_dir}"
+    fi
+}
+
 TARGET_DIR=/mnt/server
 mkdir -p "${TARGET_DIR}"
 cd "${TARGET_DIR}"
@@ -54,20 +72,26 @@ if [ -d .git ]; then
             fi
         else
             echo "Repository origin mismatch. Expected ${RAW_GIT_ADDRESS}, found ${ORIGIN}. Re-cloning..."
+            backup_dir=$(backup_existing_config)
             find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
             git clone --recursive --single-branch --branch "${BRANCH}" "${AUTH_GIT_ADDRESS}" .
+            restore_existing_config "${backup_dir}"
             should_rebuild=true
         fi
     else
         echo "Invalid git repository detected. Re-cloning..."
+        backup_dir=$(backup_existing_config)
         find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
         git clone --recursive --single-branch --branch "${BRANCH}" "${AUTH_GIT_ADDRESS}" .
+        restore_existing_config "${backup_dir}"
         should_rebuild=true
     fi
 else
     echo "No git repository found. Cloning sources..."
+    backup_dir=$(backup_existing_config)
     find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     git clone --recursive --single-branch --branch "${BRANCH}" "${AUTH_GIT_ADDRESS}" .
+    restore_existing_config "${backup_dir}"
     should_rebuild=true
 fi
 
