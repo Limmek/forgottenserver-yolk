@@ -144,6 +144,60 @@ else
     echo "Auto-update is disabled. Skipping update check."
 fi
 
+if [ -n "${MOUNT_PATH}" ]; then
+    mount_root="${MOUNT_PATH%/}"
+    if ls -d "${mount_root}" >/dev/null 2>&1; then
+        echo "Mount path ${mount_root} detected. Setting up persistent links."
+
+        mount_data_dir="${mount_root}/data"
+        mount_config_file="${mount_root}/config.lua"
+
+        mkdir -p "${mount_data_dir}"
+
+        if [ -L /home/container/data ] && [ "$(readlink -f /home/container/data)" != "$(readlink -f "${mount_data_dir}")" ]; then
+            rm -f /home/container/data
+        fi
+
+        if [ -d /home/container/data ] && [ ! -L /home/container/data ]; then
+            if [ -z "$(ls -A "${mount_data_dir}" 2>/dev/null)" ]; then
+                cp -a /home/container/data/. "${mount_data_dir}/"
+                echo "Copied existing data directory into mounted volume."
+            fi
+            rm -rf /home/container/data
+        fi
+
+        if [ ! -L /home/container/data ]; then
+            ln -s "${mount_data_dir}" /home/container/data
+            echo "Linked /home/container/data to ${mount_data_dir}."
+        fi
+
+        if [ -L /home/container/config.lua ] && [ "$(readlink -f /home/container/config.lua)" != "$(readlink -f "${mount_config_file}")" ]; then
+            rm -f /home/container/config.lua
+        fi
+
+        if [ -f /home/container/config.lua ] && [ ! -L /home/container/config.lua ]; then
+            mkdir -p "${mount_root}"
+            if [ ! -f "${mount_config_file}" ]; then
+                cp /home/container/config.lua "${mount_config_file}"
+                echo "Copied existing config.lua into mounted volume."
+            fi
+            rm -f /home/container/config.lua
+        fi
+
+        if [ ! -f "${mount_config_file}" ]; then
+            mkdir -p "${mount_root}"
+            touch "${mount_config_file}"
+        fi
+
+        if [ ! -L /home/container/config.lua ]; then
+            ln -s "${mount_config_file}" /home/container/config.lua
+            echo "Linked /home/container/config.lua to ${mount_config_file}."
+        fi
+    else
+        echo "Mount path ${mount_root} not accessible. Skipping mount setup."
+    fi
+fi
+
 # Replace Startup Variables
 MODIFIED_STARTUP=$(echo -e ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')
 echo -e ":/home/container$ ${MODIFIED_STARTUP}"
