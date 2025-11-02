@@ -146,31 +146,49 @@ else
     echo "Auto-update is disabled. Skipping update check."
 fi
 
-# Setup Mount Links
+
+# MyAAC need access to config.lua and data directory on a mounted volume since it can not access the container filesystem.
+# Sync container config and data to mounted directory
 if [ -n "${MOUNT_PATH:-}" ]; then
     mount_root="${MOUNT_PATH%/}"
     if ls -d "${mount_root}" >/dev/null 2>&1; then
-        echo "Mount path ${mount_root} detected. Ensuring mount links exist."
+        echo "Mount path ${mount_root} detected. Syncing data and config."
 
-        if [ -L "${mount_root}/data" ]; then
-            echo "Mount data link already present."
-        elif [ -e "${mount_root}/data" ]; then
-            echo "Skipping ${mount_root}/data link because a non-symlink already exists."
+        mkdir -p "${mount_root}"
+
+        # Sync config.lua if it changed
+        if [ -f /home/container/config.lua ]; then
+            mount_config="${mount_root}/config.lua"
+            if [ ! -f "${mount_config}" ]; then
+                cp /home/container/config.lua "${mount_config}"
+                echo "Copied config.lua to mount."
+            elif ! cmp -s /home/container/config.lua "${mount_config}"; then
+                cp /home/container/config.lua "${mount_config}"
+                echo "Updated config.lua on mount."
+            else
+                echo "config.lua unchanged; no update needed."
+            fi
         else
-            ln -s /home/container/data "${mount_root}/data"
-            echo "Linked ${mount_root}/data -> /home/container/data."
+            echo "config.lua not found in container; skipping config sync."
         fi
 
-        if [ -L "${mount_root}/config.lua" ]; then
-            echo "Mount config link already present."
-        elif [ -e "${mount_root}/config.lua" ]; then
-            echo "Skipping ${mount_root}/config.lua link because a non-symlink already exists."
+        # Sync data directory, preserving nested content
+        if [ -d /home/container/data ]; then
+            mkdir -p "${mount_root}/data"
+            if command -v rsync >/dev/null 2>&1; then
+                rsync -a --delete --checksum /home/container/data/ "${mount_root}/data/"
+                echo "Data directory synced to mount using rsync."
+            else
+                echo "rsync not available; performing full data copy."
+                rm -rf "${mount_root}/data"
+                mkdir -p "${mount_root}/data"
+                cp -a /home/container/data/. "${mount_root}/data/"
+            fi
         else
-            ln -s /home/container/config.lua "${mount_root}/config.lua"
-            echo "Linked ${mount_root}/config.lua -> /home/container/config.lua."
+            echo "Data directory not found in container; skipping data sync."
         fi
     else
-        echo "Mount path ${mount_root} not accessible. Skipping mount setup."
+        echo "Mount path ${mount_root} not accessible. Skipping mount sync."
     fi
 fi
 
