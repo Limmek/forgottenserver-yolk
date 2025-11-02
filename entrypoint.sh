@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 cd /home/container
 
 # Make internal Docker IP address available to processes.
