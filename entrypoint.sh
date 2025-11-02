@@ -146,54 +146,28 @@ else
     echo "Auto-update is disabled. Skipping update check."
 fi
 
-if [ -n "${MOUNT_PATH}" ]; then
+# Setup Mount Links
+if [ -n "${MOUNT_PATH:-}" ]; then
     mount_root="${MOUNT_PATH%/}"
     if ls -d "${mount_root}" >/dev/null 2>&1; then
-        echo "Mount path ${mount_root} detected. Setting up persistent links."
+        echo "Mount path ${mount_root} detected. Ensuring mount links exist."
 
-        mount_data_dir="${mount_root}/data"
-        mount_config_file="${mount_root}/config.lua"
-
-        mkdir -p "${mount_data_dir}"
-
-        if [ -L /home/container/data ] && [ "$(readlink -f /home/container/data)" != "$(readlink -f "${mount_data_dir}")" ]; then
-            rm -f /home/container/data
+        if [ -L "${mount_root}/data" ]; then
+            echo "Mount data link already present."
+        elif [ -e "${mount_root}/data" ]; then
+            echo "Skipping ${mount_root}/data link because a non-symlink already exists."
+        else
+            ln -s /home/container/data "${mount_root}/data"
+            echo "Linked ${mount_root}/data -> /home/container/data."
         fi
 
-        if [ -d /home/container/data ] && [ ! -L /home/container/data ]; then
-            if [ -z "$(ls -A "${mount_data_dir}" 2>/dev/null)" ]; then
-                cp -a /home/container/data/. "${mount_data_dir}/"
-                echo "Copied existing data directory into mounted volume."
-            fi
-            rm -rf /home/container/data
-        fi
-
-        if [ ! -L /home/container/data ]; then
-            ln -s "${mount_data_dir}" /home/container/data
-            echo "Linked /home/container/data to ${mount_data_dir}."
-        fi
-
-        if [ -L /home/container/config.lua ] && [ "$(readlink -f /home/container/config.lua)" != "$(readlink -f "${mount_config_file}")" ]; then
-            rm -f /home/container/config.lua
-        fi
-
-        if [ -f /home/container/config.lua ] && [ ! -L /home/container/config.lua ]; then
-            mkdir -p "${mount_root}"
-            if [ ! -f "${mount_config_file}" ]; then
-                cp /home/container/config.lua "${mount_config_file}"
-                echo "Copied existing config.lua into mounted volume."
-            fi
-            rm -f /home/container/config.lua
-        fi
-
-        if [ ! -f "${mount_config_file}" ]; then
-            mkdir -p "${mount_root}"
-            touch "${mount_config_file}"
-        fi
-
-        if [ ! -L /home/container/config.lua ]; then
-            ln -s "${mount_config_file}" /home/container/config.lua
-            echo "Linked /home/container/config.lua to ${mount_config_file}."
+        if [ -L "${mount_root}/config.lua" ]; then
+            echo "Mount config link already present."
+        elif [ -e "${mount_root}/config.lua" ]; then
+            echo "Skipping ${mount_root}/config.lua link because a non-symlink already exists."
+        else
+            ln -s /home/container/config.lua "${mount_root}/config.lua"
+            echo "Linked ${mount_root}/config.lua -> /home/container/config.lua."
         fi
     else
         echo "Mount path ${mount_root} not accessible. Skipping mount setup."
