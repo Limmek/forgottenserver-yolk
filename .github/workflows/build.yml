@@ -39,11 +39,11 @@ jobs:
             fi
           done
 
-          # Get unique directories
-          images=$(echo "$changed_dirs" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+          images=$(echo "$changed_dirs" | tr ' ' '\n' | sort -u | xargs)
 
           echo "Images to build: $images"
-          echo "matrix={\"include\":[$(echo $images | jq -R 'split(" ") | map(select(length > 0)) | map({image: .}) | tojson | .[1:-1]')]}" | tee $GITHUB_OUTPUT
+          matrix_json=$(echo "$images" | jq -R 'split(" ") | map(select(length > 0)) | map({image: .})')
+          echo "matrix={\"include\":${matrix_json}}" | tee $GITHUB_OUTPUT
 
   build:
     needs: list-images
