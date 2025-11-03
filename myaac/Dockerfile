@@ -21,8 +21,10 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN adduser -D -h /home/container container
 
 WORKDIR /home/container
-RUN git config --global --add safe.directory /home/container && \
-    git clone https://github.com/slawkens/myaac.git . && \
+RUN mkdir public && \
+    git config --global --add safe.directory /home/container/public && \
+    git clone https://github.com/slawkens/myaac.git public && \
+    cd public && \
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader && \
     npm install && \
     npm run production && \
