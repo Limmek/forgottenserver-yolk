@@ -34,8 +34,8 @@ RUN git clone https://github.com/slawkens/myaac.git . && \
     chmod 660 images/gallery && \
     chmod -R 760 system/cache
 
-COPY --chown=container:container config/nginx.conf /etc/nginx/nginx.conf
-COPY --chown=container:container config/supervisord.conf /etc/supervisord.conf
+COPY --chown=container:container nginx.conf /etc/nginx/nginx.conf
+COPY --chown=container:container supervisord.conf /etc/supervisord.conf
 COPY --chown=container:container entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
