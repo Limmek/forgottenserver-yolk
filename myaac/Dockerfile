@@ -1,53 +1,26 @@
-FROM alpine:latest
+FROM ubuntu:24.04
 
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
-    apk --update --no-cache add \
-    curl \
-    ca-certificates \
-    nginx \
-    git \
-    php82 \
-    php82-xml \
-    php82-exif \
-    php82-fpm \
-    php82-soap \
-    php82-openssl \
-    php82-gmp \
-    php82-dom \
-    php82-pdo \
-    php82-zip \
-    php82-mysqli \
-    php82-sqlite3 \
-    php82-bcmath \
-    php82-gd \
-    php82-pdo_mysql \
-    php82-pdo_sqlite \
-    php82-gettext \
-    php82-xmlreader \
-    php82-bz2 \
-    php82-iconv \
-    php82-curl \
-    php82-ctype \
-    php82-phar \
-    php82-fileinfo \
-    php82-mbstring \
-    php82-tokenizer \
-    php82-simplexml
+ENV DEBIAN_FRONTEND=noninteractive
 
-COPY --from=composer:latest  /usr/bin/composer /usr/bin/composer
+RUN useradd -m -d /home/container -s /bin/bash container
+ENV USER=container HOME=/home/container
 
-RUN adduser -D -h /home/container container
+RUN apt update \
+    && apt upgrade -y
 
-USER container
-ENV USER=container
-ENV HOME=/home/container
+RUN apt install -y gcc g++ libgcc1 libc++-dev gdb libc6 git wget curl tar zip unzip binutils xz-utils liblzo2-2 cabextract iproute2 net-tools netcat-openbsd telnet libatomic1 libsdl1.2debian libsdl2-2.0-0 \
+    libfontconfig icu-devtools libunwind8 sqlite3 libsqlite3-dev libzip4 locales ffmpeg apt-transport-https init-system-helpers \
+    libcurl3-gnutls liblua5.1-0 libluajit-5.1-2 libsqlite3-0 bzip2 zlib1g libevent-dev libmariadb-dev-compat libmariadb-dev libssl-dev \
+    libfluidsynth-dev libmariadb-dev libicu-dev libssl3 libduktape207 libjsoncpp-dev libleveldb1d libncurses6 libncursesw6 tini 
+
+RUN update-locale lang=en_US.UTF-8 \
+    && dpkg-reconfigure --frontend noninteractive locales
 
 WORKDIR /home/container
-COPY ./entrypoint.sh /entrypoint.sh
 
-RUN curl -fLo /home/container/nginx.conf https://raw.githubusercontent.com/Limmek/yolks/refs/heads/main/myaac/nginx.conf || { echo "Failed to download nginx config"; exit 1; }
-RUN curl -fLo /home/container/start.sh https://raw.githubusercontent.com/Limmek/yolks/refs/heads/main/myaac/start.sh || { echo "Failed to download start script"; exit 1; } && chmod +x /home/container/start.sh
+STOPSIGNAL SIGINT
 
-RUN git clone https://github.com/slawkens/myaac.git /home/container/public
-
-CMD ["/bin/ash", "/entrypoint.sh"]
+COPY --chown=container:container ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
+CMD ["/entrypoint.sh"]
