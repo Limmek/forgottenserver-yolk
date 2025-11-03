@@ -27,7 +27,7 @@ RUN mkdir public && \
     cd public && \
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader && \
     npm install && \
-    npm run production && \
+    npm run build && \
     chmod 660 images/guilds && \
     chmod 660 images/houses && \
     chmod 660 images/gallery && \
