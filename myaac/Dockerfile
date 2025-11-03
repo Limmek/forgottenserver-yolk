@@ -1,8 +1,39 @@
 FROM alpine:latest
 
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories
-RUN apk --update --no-cache add curl ca-certificates nginx
-RUN apk --update --no-cache add php8 php8-xml php8-exif php8-fpm php8-soap php8-openssl php8-gmp php8-dom php8-pdo php8-zip php8-mysqli php8-sqlite3 php8-bcmath php8-gd php8-pdo_mysql php8-pdo_sqlite php8-gettext php8-xmlreader php8-bz2 php8-iconv php8-curl php8-ctype php8-phar php8-fileinfo php8-mbstring php8-tokenizer php8-simplexml
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
+    apk --update --no-cache add \
+    curl \
+    ca-certificates \
+    nginx \
+    git \
+    php82 \
+    php82-xml \
+    php82-exif \
+    php82-fpm \
+    php82-soap \
+    php82-openssl \
+    php82-gmp \
+    php82-dom \
+    php82-pdo \
+    php82-zip \
+    php82-mysqli \
+    php82-sqlite3 \
+    php82-bcmath \
+    php82-gd \
+    php82-pdo_mysql \
+    php82-pdo_sqlite \
+    php82-gettext \
+    php82-xmlreader \
+    php82-bz2 \
+    php82-iconv \
+    php82-curl \
+    php82-ctype \
+    php82-phar \
+    php82-fileinfo \
+    php82-mbstring \
+    php82-tokenizer \
+    php82-simplexml
+
 COPY --from=composer:latest  /usr/bin/composer /usr/bin/composer
 
 RUN adduser -D -h /home/container container
