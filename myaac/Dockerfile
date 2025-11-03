@@ -21,10 +21,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN adduser -D -h /home/container container
 
 WORKDIR /home/container
-RUN git clone https://github.com/slawkens/myaac.git . && \
+RUN git config --global --add safe.directory /home/container && \
+    git clone https://github.com/slawkens/myaac.git . && \
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader && \
     npm install && \
-    npm run build && \
+    npm run production && \
     chmod 660 images/guilds && \
     chmod 660 images/houses && \
     chmod 660 images/gallery && \
@@ -42,6 +43,6 @@ USER container
 ENV  USER=container HOME=/home/container
 WORKDIR /home/container
 
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["/bin/bash", "/entrypoint.sh"]
