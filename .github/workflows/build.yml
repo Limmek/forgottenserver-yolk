@@ -42,7 +42,7 @@ jobs:
           images=$(echo "$changed_dirs" | tr ' ' '\n' | sort -u | xargs)
 
           echo "Images to build: $images"
-          matrix_json=$(echo "$images" | jq -R 'split(" ") | map(select(length > 0)) | map({image: .})')
+          matrix_json=$(echo "$images" | jq -c -R 'split(" ") | map(select(length > 0)) | map({image: .})')
           echo "matrix={\"include\":${matrix_json}}" | tee $GITHUB_OUTPUT
 
   build:
