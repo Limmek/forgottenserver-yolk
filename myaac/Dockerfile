@@ -20,19 +20,18 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 RUN adduser -D -h /home/container container
 
-RUN mkdir -p /home/container/tmp/nginx /run/php /var/log/supervisor \
-    && chown -R container:container /home/container /run/php /var/log/supervisor
-
 WORKDIR /home/container
 RUN git clone https://github.com/slawkens/myaac.git . && \
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader && \
     npm install && \
     npm run build && \
-    chown -R container:container /home/container && \
     chmod 660 images/guilds && \
     chmod 660 images/houses && \
     chmod 660 images/gallery && \
     chmod -R 760 system/cache
+
+RUN mkdir -p /home/container/tmp/nginx /run/php /var/log/supervisor \
+    && chown -R container:container /home/container /run/php /var/log/supervisor
 
 COPY --chown=container:container nginx.conf /etc/nginx/nginx.conf
 COPY --chown=container:container supervisord.conf /etc/supervisord.conf
