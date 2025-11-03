@@ -1,0 +1,82 @@
+name: Build Images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  list-images:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch depth 0 is required for tj-actions/changed-files to compare commits
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+
+      - id: set-matrix
+        name: Find images to build based on changes
+        run: |
+          changed_dirs=""
+          for file in ${{ steps.changed-files.outputs.all_changed_and_modified_files }}; do
+            dir=$(dirname "$file")
+            # Check if the directory contains a Dockerfile and is a top-level directory
+            if [ -f "$dir/Dockerfile" ] && [[ "$dir" != "." ]] && [[ "$dir" != *'/'* ]]; then
+              changed_dirs="$changed_dirs $dir"
+            fi
+          done
+
+          # Get unique directories
+          images=$(echo "$changed_dirs" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+          echo "Images to build: $images"
+          echo "matrix={\"include\":[$(echo $images | jq -R 'split(" ") | map(select(length > 0)) | map({image: .}) | tojson | .[1:-1]')]}" | tee $GITHUB_OUTPUT
+
+  build:
+    needs: list-images
+    if: ${{ needs.list-images.outputs.matrix != '{"include":[]}' }}
+    strategy:
+      matrix: ${{ fromJson(needs.list-images.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.image }}
+          file: ./${{ matrix.image }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
