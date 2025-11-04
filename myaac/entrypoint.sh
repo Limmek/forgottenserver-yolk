@@ -10,9 +10,10 @@ SITES_AVAILABLE="/home/container/sites-available"
 SITES_ENABLED="/home/container/sites-enabled"
 DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
 
-# Create user-managed config directories if they don't exist
+# Create user-managed config and log directories if they don't exist
 mkdir -p "$SITES_AVAILABLE"
 mkdir -p "$SITES_ENABLED"
+mkdir -p "/home/container/logs"
 
 # Clone and install MyAAC if it doesn't exist
 if [ ! -d "/home/container/myaac" ]; then
@@ -37,15 +38,19 @@ if [ ! -L "$SITES_ENABLED/000-default.conf" ] && [ -f "$SITES_AVAILABLE/000-defa
     ln -s "$SITES_AVAILABLE/000-default.conf" "$SITES_ENABLED/000-default.conf"
 fi
 
+# Ensure Apache runtime directory exists and is writable by www-data
+mkdir -p /var/run/apache2
+chown www-data:www-data /var/run/apache2
+
 echo "Starting server..."
 
-# Check if a custom startup command is provided
-if [ -z "${STARTUP}" ]; then
-    # If STARTUP is not set or is empty, use the default command
-    echo "No custom startup command found, starting Apache directly."
+# Check if the startup command is set to "None"
+if [ "${STARTUP}" == "None" ]; then
+    # If STARTUP is "None", use the default command
+    echo "STARTUP is 'None', starting Apache directly."
     exec apache2-foreground
 else
-    # If STARTUP is set, process and run it.
+    # If STARTUP is set to anything else, process and run it.
     # This allows for Pterodactyl's variable substitution.
     MODIFIED_STARTUP=$(eval echo "$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')")
     echo ":/home/container$ ${MODIFIED_STARTUP}"
