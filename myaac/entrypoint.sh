@@ -15,9 +15,7 @@ mkdir -p "$SITES_AVAILABLE"
 mkdir -p "$SITES_ENABLED"
 mkdir -p "/home/container/logs"
 mkdir -p "${APACHE_RUN_DIR}"
-chown container:container "${APACHE_RUN_DIR}"
 chmod 755 "${APACHE_RUN_DIR}"
-chown -R container:container "/home/container/logs"
 chmod 755 "/home/container/logs"
 
 # Clone and install MyAAC if it doesn't exist
@@ -30,7 +28,6 @@ if [ ! -d "/home/container/myaac" ]; then
 
     # Set permissions based on MyAAC recommendations
     echo "Setting file permissions..."
-    chown -R container:container /home/container/myaac
     chmod 660 /home/container/images/guilds
     chmod 660 /home/container/images/houses
     chmod 660 /home/container/images/gallery
