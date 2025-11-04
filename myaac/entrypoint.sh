@@ -1,17 +1,21 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+cd /home/container
+
+# Make internal Docker IP address available to processes.
+INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+export INTERNAL_IP
 
 # Default to port 8080 if SERVER_PORT is not set
 export APACHE_PORT=${SERVER_PORT:-8080}
 
 APACHE_BASE_DIR="/home/container/apache"
 ROOT_CONF="${APACHE_BASE_DIR}/000-default.conf"
-APACHE_CONF_DIR="/etc/apache2"
 PORTS_CONF="${APACHE_BASE_DIR}/ports.conf"
 SITES_AVAILABLE="${APACHE_BASE_DIR}/sites-available"
 SITES_ENABLED="${APACHE_BASE_DIR}/sites-enabled"
 DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
-DEFAULT_PORTS_CONF="${APACHE_CONF_DIR}/ports.conf"
 
 
 # Create user-managed config, log, and runtime directories if they don't exist
@@ -26,10 +30,23 @@ chmod 755 "/home/container/logs"
 
 # Ensure a writable ports.conf managed from /home/container
 if [ ! -f "$PORTS_CONF" ]; then
-    if [ -f "$DEFAULT_PORTS_CONF" ]; then
-        cp "$DEFAULT_PORTS_CONF" "$PORTS_CONF"
+    cat <<EOF > "$PORTS_CONF"
+Listen 0.0.0.0:${APACHE_PORT}
+Listen [::]:${APACHE_PORT}
+EOF
+else
+    if grep -qE '^Listen 0\.0\.0\.0:[0-9]+' "$PORTS_CONF"; then
+        sed -i "0,/^Listen 0\\.0\\.0\\.0:[0-9]\+/{s//Listen 0.0.0.0:${APACHE_PORT}/}" "$PORTS_CONF"
+    elif grep -qE '^Listen [0-9]+' "$PORTS_CONF"; then
+        sed -i "0,/^Listen [0-9]\+/{s//Listen 0.0.0.0:${APACHE_PORT}/}" "$PORTS_CONF"
     else
-        echo "Listen ${APACHE_PORT}" > "$PORTS_CONF"
+        sed -i "1s|^|Listen 0.0.0.0:${APACHE_PORT}\n|" "$PORTS_CONF"
+    fi
+
+    if grep -qE '^Listen \[::\]:[0-9]+' "$PORTS_CONF"; then
+        sed -i "0,/^Listen \\[::\\]:[0-9]\+/{s//Listen [::]:${APACHE_PORT}/}" "$PORTS_CONF"
+    else
+        printf '%s\n' "Listen [::]:${APACHE_PORT}" >> "$PORTS_CONF"
     fi
 fi
 chmod 644 "$PORTS_CONF" 2>/dev/null || true
@@ -70,13 +87,9 @@ if [ ! -L "$SITES_ENABLED/000-default.conf" ] || [ "$(readlink -f "$SITES_ENABLE
     ln -s "$ROOT_CONF" "$SITES_ENABLED/000-default.conf"
 fi
 
-# Update Apache configuration to listen on the requested port
-if grep -qE '^Listen [0-9]+' "$PORTS_CONF"; then
-    sed -i "0,/^Listen [0-9]\+/{s//Listen ${APACHE_PORT}/}" "$PORTS_CONF"
-else
-    echo "Listen ${APACHE_PORT}" >> "$PORTS_CONF"
-fi
 sed -i "0,/<VirtualHost \*:[0-9]\+>/{s//<VirtualHost *:${APACHE_PORT}>/}" "$ROOT_CONF"
+
+echo "Apache will listen on port ${APACHE_PORT}"
 
 export APACHE_RUN_USER=container
 export APACHE_RUN_GROUP=container
