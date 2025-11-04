@@ -26,7 +26,10 @@ RUN useradd -m -d /home/container -s /bin/bash container
 COPY 000-default.conf /etc/apache2/sites-available/default-template.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
-    && sed -i 's|IncludeOptional sites-enabled/\*.conf|IncludeOptional /home/container/apache/sites-enabled/\*.conf|' /etc/apache2/apache2.conf
+    && sed -i \
+    -e 's|IncludeOptional sites-enabled/\*.conf|IncludeOptional /home/container/apache/sites-enabled/\*.conf|' \
+    -e 's|IncludeOptional ports.conf|IncludeOptional /home/container/apache/ports.conf|' \
+    /etc/apache2/apache2.conf
 
 # Override Apache's default runtime directories
 ENV APACHE_RUN_DIR=/home/container/apache/run
