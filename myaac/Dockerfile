@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libxml2-dev \
     libicu-dev \
+    iproute2 \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/* \
