@@ -40,7 +40,7 @@ RUN mkdir -p /home/container/myaac \
 WORKDIR /home/container/myaac
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
     && npm install \
-    && npm run prod
+    && npm run production
 
 # Switch back to root temporarily to set final permissions
 USER root
