@@ -4,7 +4,12 @@ set -euo pipefail
 cd /home/container
 
 # Make internal Docker IP address available to processes.
-INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+if command -v ip >/dev/null 2>&1; then
+    INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
+else
+    INTERNAL_IP="127.0.0.1"
+    echo "Warning: 'ip' command not found; INTERNAL_IP defaulting to ${INTERNAL_IP}" >&2
+fi
 export INTERNAL_IP
 
 # Default to port 8080 if SERVER_PORT is not set
@@ -33,10 +38,6 @@ chmod 755 "/home/container/logs"
 if [ ! -f "$PORTS_CONF" ]; then
     if [ -f "$DEFAULT_PORTS_CONF" ]; then
         cp "$DEFAULT_PORTS_CONF" "$PORTS_CONF"
-    else
-        cat <<EOF > "$PORTS_CONF"
-Listen ${APACHE_PORT}
-EOF
     fi
 fi
 
