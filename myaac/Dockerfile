@@ -34,20 +34,8 @@ USER container
 ENV  USER=container HOME=/home/container
 WORKDIR /home/container
 
-# Clone and install MyAAC as the container user
-RUN mkdir -p /home/container/myaac \
-    && git clone https://github.com/slawkens/myaac.git /home/container/myaac
-WORKDIR /home/container/myaac
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && npm install
-
-# Switch back to root temporarily to set final permissions
-USER root
-RUN chown -R container:www-data /home/container/myaac \
-    && chmod -R 775 /home/container/myaac
-
 # Final WORKDIR and user for runtime
-USER container
+USER root
 WORKDIR /home/container
 
 # Expose port 80 (the entrypoint will handle the actual port)

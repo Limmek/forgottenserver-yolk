@@ -14,10 +14,21 @@ DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
 mkdir -p "$SITES_AVAILABLE"
 mkdir -p "$SITES_ENABLED"
 
+# Clone and install MyAAC if it doesn't exist
+if [ ! -d "/home/container/myaac" ]; then
+    echo "MyAAC not found, cloning repository..."
+    git clone https://github.com/slawkens/myaac.git /home/container/myaac
+    cd /home/container/myaac
+    composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+    npm install
+    chown -R container:www-data /home/container/myaac
+    chmod -R 775 /home/container/myaac
+    cd /home/container
+fi
+
 # If user-editable config doesn't exist, copy the default template
-if [ ! -f "$CONF_FILE" ]; then
-    echo "Copying default config to $CONF_FILE"
-    # We now copy it to the user-managed sites-available directory
+if [ ! -f "$SITES_AVAILABLE/000-default.conf" ]; then
+    echo "Copying default config to $SITES_AVAILABLE/000-default.conf"
     cp "$DEFAULT_TEMPLATE" "$SITES_AVAILABLE/000-default.conf"
 fi
 
@@ -36,7 +47,19 @@ for conf in "$SITES_AVAILABLE"/*.conf; do
     fi
 done
 
-echo "Starting Apache on port ${APACHE_PORT}..."
+echo "Starting server..."
 
-# Start Apache in the foreground
-exec apache2-foreground
+# Check if a custom startup command is provided
+if [ -z "${STARTUP}" ]; then
+    # If STARTUP is not set or is empty, use the default command
+    echo "No custom startup command found, starting Apache directly."
+    exec apache2-foreground
+else
+    # If STARTUP is set, process and run it.
+    # This allows for Pterodactyl's variable substitution.
+    MODIFIED_STARTUP=$(eval echo "$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')")
+    echo ":/home/container$ ${MODIFIED_STARTUP}"
+
+    # Execute the custom command
+    eval "${MODIFIED_STARTUP}"
+fi
