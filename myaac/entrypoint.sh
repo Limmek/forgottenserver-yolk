@@ -20,7 +20,7 @@ if [ ! -d "/home/container/myaac" ]; then
     git clone https://github.com/slawkens/myaac.git /home/container/myaac
     cd /home/container/myaac
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-    npm install
+    npm install --production
     chown -R container:www-data /home/container/myaac
     chmod -R 775 /home/container/myaac
     cd /home/container
@@ -36,16 +36,6 @@ fi
 if [ ! -L "$SITES_ENABLED/000-default.conf" ] && [ -f "$SITES_AVAILABLE/000-default.conf" ]; then
     ln -s "$SITES_AVAILABLE/000-default.conf" "$SITES_ENABLED/000-default.conf"
 fi
-
-# Update port in main apache config
-sed -i "s/Listen 80/Listen ${APACHE_PORT}/g" "$APACHE_CONF_DIR/ports.conf"
-
-# Update port in all user's virtual host configs
-for conf in "$SITES_AVAILABLE"/*.conf; do
-    if [ -f "$conf" ]; then
-        sed -i "s/<VirtualHost \*:[0-9]*>/<VirtualHost *:${APACHE_PORT}>/g" "$conf"
-    fi
-done
 
 echo "Starting server..."
 

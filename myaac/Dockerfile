@@ -32,6 +32,7 @@ RUN chmod +x /entrypoint.sh \
 # Switch to the non-root user for all subsequent operations
 USER container
 ENV  USER=container HOME=/home/container
+ENV  NPM_CONFIG_CACHE=/home/container/.npm
 WORKDIR /home/container
 
 # Final WORKDIR and user for runtime
