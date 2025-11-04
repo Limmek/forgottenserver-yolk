@@ -1,26 +1,59 @@
-FROM ubuntu:24.04
+FROM php:8.2-apache
 
-ENV DEBIAN_FRONTEND=noninteractive
+# Install system dependencies, PHP extensions, and helper tools as root
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    unzip \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libxml2-dev \
+    libicu-dev \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd zip xml pdo pdo_mysql bcmath intl \
+    && a2enmod rewrite
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-RUN useradd -m -d /home/container -s /bin/bash container
-ENV USER=container HOME=/home/container
+# Create the non-root user and add it to the www-data group
+RUN useradd -m -d /home/container -s /bin/bash container \
+    && usermod -aG www-data container
 
-RUN apt update \
-    && apt upgrade -y
+# Set up Apache configuration template and entrypoint as root
+COPY 000-default.conf /etc/apache2/sites-available/default-template.conf
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh \
+    && sed -i 's|IncludeOptional sites-enabled/\*.conf|IncludeOptional /home/container/sites-enabled/\*.conf|' /etc/apache2/apache2.conf
 
-RUN apt install -y gcc g++ libgcc1 libc++-dev gdb libc6 git wget curl tar zip unzip binutils xz-utils liblzo2-2 cabextract iproute2 net-tools netcat-openbsd telnet libatomic1 libsdl1.2debian libsdl2-2.0-0 \
-    libfontconfig icu-devtools libunwind8 sqlite3 libsqlite3-dev libzip4 locales ffmpeg apt-transport-https init-system-helpers \
-    libcurl3-gnutls liblua5.1-0 libluajit-5.1-2 libsqlite3-0 bzip2 zlib1g libevent-dev libmariadb-dev-compat libmariadb-dev libssl-dev \
-    libfluidsynth-dev libmariadb-dev libicu-dev libssl3 libduktape207 libjsoncpp-dev libleveldb1d libncurses6 libncursesw6 tini 
-
-RUN update-locale lang=en_US.UTF-8 \
-    && dpkg-reconfigure --frontend noninteractive locales
-
+# Switch to the non-root user for all subsequent operations
+USER container
+ENV  USER=container HOME=/home/container
 WORKDIR /home/container
 
-STOPSIGNAL SIGINT
+# Clone and install MyAAC as the container user
+RUN mkdir -p /home/container/myaac \
+    && git clone https://github.com/slawkens/myaac.git /home/container/myaac
+WORKDIR /home/container/myaac
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+    && npm install \
+    && npm run prod
 
-COPY --chown=container:container ./entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
-CMD ["/entrypoint.sh"]
+# Switch back to root temporarily to set final permissions
+USER root
+RUN chown -R container:www-data /home/container/myaac \
+    && chmod -R 775 /home/container/myaac
+
+# Final WORKDIR and user for runtime
+USER container
+WORKDIR /home/container
+
+# Expose port 80 (the entrypoint will handle the actual port)
+EXPOSE 80
+
+# Set the entrypoint to our custom script, which will start Apache
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []
