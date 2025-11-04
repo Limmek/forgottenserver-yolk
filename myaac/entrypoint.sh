@@ -16,6 +16,7 @@ PORTS_CONF="${APACHE_BASE_DIR}/ports.conf"
 SITES_AVAILABLE="${APACHE_BASE_DIR}/sites-available"
 SITES_ENABLED="${APACHE_BASE_DIR}/sites-enabled"
 DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
+DEFAULT_PORTS_CONF="/etc/apache2/ports.conf"
 
 
 # Create user-managed config, log, and runtime directories if they don't exist
@@ -30,25 +31,25 @@ chmod 755 "/home/container/logs"
 
 # Ensure a writable ports.conf managed from /home/container
 if [ ! -f "$PORTS_CONF" ]; then
-    cat <<EOF > "$PORTS_CONF"
-Listen 0.0.0.0:${APACHE_PORT}
-Listen [::]:${APACHE_PORT}
+    if [ -f "$DEFAULT_PORTS_CONF" ]; then
+        cp "$DEFAULT_PORTS_CONF" "$PORTS_CONF"
+    else
+        cat <<EOF > "$PORTS_CONF"
+Listen ${APACHE_PORT}
 EOF
-else
-    if grep -qE '^Listen 0\.0\.0\.0:[0-9]+' "$PORTS_CONF"; then
-        sed -i "0,/^Listen 0\\.0\\.0\\.0:[0-9]\+/{s//Listen 0.0.0.0:${APACHE_PORT}/}" "$PORTS_CONF"
-    elif grep -qE '^Listen [0-9]+' "$PORTS_CONF"; then
-        sed -i "0,/^Listen [0-9]\+/{s//Listen 0.0.0.0:${APACHE_PORT}/}" "$PORTS_CONF"
-    else
-        sed -i "1s|^|Listen 0.0.0.0:${APACHE_PORT}\n|" "$PORTS_CONF"
-    fi
-
-    if grep -qE '^Listen \[::\]:[0-9]+' "$PORTS_CONF"; then
-        sed -i "0,/^Listen \\[::\\]:[0-9]\+/{s//Listen [::]:${APACHE_PORT}/}" "$PORTS_CONF"
-    else
-        printf '%s\n' "Listen [::]:${APACHE_PORT}" >> "$PORTS_CONF"
     fi
 fi
+
+# if grep -qE '^Listen [0-9]+$' "$PORTS_CONF"; then
+#     sed -i "0,/^Listen [0-9]\+$/s//Listen ${APACHE_PORT}/" "$PORTS_CONF"
+# elif grep -qE '^Listen 0\.0\.0\.0:[0-9]+' "$PORTS_CONF"; then
+#     sed -i "0,/^Listen 0\\.0\\.0\\.0:[0-9]\+/{s//Listen 0.0.0.0:${APACHE_PORT}/}" "$PORTS_CONF"
+# elif grep -qE '^Listen \[::\]:[0-9]+' "$PORTS_CONF"; then
+#     sed -i "0,/^Listen \\[::\\]:[0-9]\+/{s//Listen [::]:${APACHE_PORT}/}" "$PORTS_CONF"
+# elif ! grep -qE "^Listen .*${APACHE_PORT}" "$PORTS_CONF"; then
+#     printf 'Listen %s\n' "${APACHE_PORT}" >> "$PORTS_CONF"
+# fi
+
 chmod 644 "$PORTS_CONF" 2>/dev/null || true
 
 # Clone and install MyAAC if it doesn't exist
@@ -87,7 +88,7 @@ if [ ! -L "$SITES_ENABLED/000-default.conf" ] || [ "$(readlink -f "$SITES_ENABLE
     ln -s "$ROOT_CONF" "$SITES_ENABLED/000-default.conf"
 fi
 
-sed -i "0,/<VirtualHost \*:[0-9]\+>/{s//<VirtualHost *:${APACHE_PORT}>/}" "$ROOT_CONF"
+# sed -i "0,/<VirtualHost \*:[0-9]\+>/{s//<VirtualHost *:${APACHE_PORT}>/}" "$ROOT_CONF"
 
 echo "Apache will listen on port ${APACHE_PORT}"
 
