@@ -19,9 +19,8 @@ RUN apt-get update && apt-get install -y \
     && a2enmod rewrite
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create the non-root user and add it to the www-data group
-RUN useradd -m -d /home/container -s /bin/bash container \
-    && usermod -aG www-data container
+# Create the non-root user
+RUN useradd -m -d /home/container -s /bin/bash container
 
 # Set up Apache configuration template and entrypoint as root
 COPY 000-default.conf /etc/apache2/sites-available/default-template.conf
@@ -33,6 +32,8 @@ RUN chmod +x /entrypoint.sh \
 ENV APACHE_RUN_DIR=/home/container/run
 ENV APACHE_PID_FILE=/home/container/run/apache2.pid
 ENV APACHE_LOCK_DIR=/home/container/run
+ENV APACHE_RUN_USER=container
+ENV APACHE_RUN_GROUP=container
 
 # Switch to the non-root user for all subsequent operations
 USER container

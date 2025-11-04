@@ -14,8 +14,11 @@ DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
 mkdir -p "$SITES_AVAILABLE"
 mkdir -p "$SITES_ENABLED"
 mkdir -p "/home/container/logs"
-mkdir -p "/home/container/run"
-chown www-data:www-data "/home/container/run"
+mkdir -p "${APACHE_RUN_DIR}"
+chown container:container "${APACHE_RUN_DIR}"
+chmod 755 "${APACHE_RUN_DIR}"
+chown -R container:container "/home/container/logs"
+chmod 755 "/home/container/logs"
 
 # Clone and install MyAAC if it doesn't exist
 if [ ! -d "/home/container/myaac" ]; then
@@ -27,7 +30,7 @@ if [ ! -d "/home/container/myaac" ]; then
 
     # Set permissions based on MyAAC recommendations
     echo "Setting file permissions..."
-    chown -R container:www-data /home/container/myaac
+    chown -R container:container /home/container/myaac
     chmod 660 /home/container/images/guilds
     chmod 660 /home/container/images/houses
     chmod 660 /home/container/images/gallery
@@ -47,9 +50,8 @@ if [ ! -L "$SITES_ENABLED/000-default.conf" ] && [ -f "$SITES_AVAILABLE/000-defa
     ln -s "$SITES_AVAILABLE/000-default.conf" "$SITES_ENABLED/000-default.conf"
 fi
 
-# Ensure Apache runtime directory exists and is writable by www-data
-mkdir -p /var/run/apache2
-chown www-data:www-data /var/run/apache2
+export APACHE_RUN_USER=container
+export APACHE_RUN_GROUP=container
 
 echo "Starting server..."
 
