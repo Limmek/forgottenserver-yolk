@@ -29,6 +29,11 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
     && sed -i 's|IncludeOptional sites-enabled/\*.conf|IncludeOptional /home/container/sites-enabled/\*.conf|' /etc/apache2/apache2.conf
 
+# Override Apache's default runtime directories
+ENV APACHE_RUN_DIR=/home/container/run
+ENV APACHE_PID_FILE=/home/container/run/apache2.pid
+ENV APACHE_LOCK_DIR=/home/container/run
+
 # Switch to the non-root user for all subsequent operations
 USER container
 ENV  USER=container HOME=/home/container
