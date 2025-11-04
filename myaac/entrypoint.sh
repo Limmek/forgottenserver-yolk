@@ -10,10 +10,12 @@ SITES_AVAILABLE="/home/container/sites-available"
 SITES_ENABLED="/home/container/sites-enabled"
 DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
 
-# Create user-managed config and log directories if they don't exist
+# Create user-managed config, log, and runtime directories if they don't exist
 mkdir -p "$SITES_AVAILABLE"
 mkdir -p "$SITES_ENABLED"
 mkdir -p "/home/container/logs"
+mkdir -p "/home/container/run"
+chown www-data:www-data "/home/container/run"
 
 # Clone and install MyAAC if it doesn't exist
 if [ ! -d "/home/container/myaac" ]; then
@@ -22,8 +24,15 @@ if [ ! -d "/home/container/myaac" ]; then
     cd /home/container/myaac
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
     npm install --production
+
+    # Set permissions based on MyAAC recommendations
+    echo "Setting file permissions..."
     chown -R container:www-data /home/container/myaac
-    chmod -R 775 /home/container/myaac
+    chmod 660 /home/container/images/guilds
+    chmod 660 /home/container/images/houses
+    chmod 660 /home/container/images/gallery
+    chmod -R 760 /home/container/system/cache
+
     cd /home/container
 fi
 
