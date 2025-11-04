@@ -4,7 +4,7 @@ set -e
 # Default to port 80 if SERVER_PORT is not set
 export APACHE_PORT=${SERVER_PORT:-80}
 
-CONF_FILE="/home/container/000-default.conf"
+ROOT_CONF="/home/container/000-default.conf"
 APACHE_CONF_DIR="/etc/apache2"
 SITES_AVAILABLE="/home/container/sites-available"
 SITES_ENABLED="/home/container/sites-enabled"
@@ -15,6 +15,7 @@ mkdir -p "$SITES_AVAILABLE"
 mkdir -p "$SITES_ENABLED"
 mkdir -p "/home/container/logs"
 mkdir -p "${APACHE_RUN_DIR}"
+chmod 755 "$SITES_AVAILABLE" "$SITES_ENABLED"
 chmod 755 "${APACHE_RUN_DIR}"
 chmod 755 "/home/container/logs"
 
@@ -37,14 +38,21 @@ if [ ! -d "/home/container/myaac" ]; then
 fi
 
 # If user-editable config doesn't exist, copy the default template
-if [ ! -f "$SITES_AVAILABLE/000-default.conf" ]; then
-    echo "Copying default config to $SITES_AVAILABLE/000-default.conf"
-    cp "$DEFAULT_TEMPLATE" "$SITES_AVAILABLE/000-default.conf"
+# Ensure a user-editable root Apache config exists and is linked
+if [ ! -f "$ROOT_CONF" ]; then
+    echo "Creating default Apache config at $ROOT_CONF"
+    cp "$DEFAULT_TEMPLATE" "$ROOT_CONF"
 fi
 
-# Link the default config if it's not already linked
-if [ ! -L "$SITES_ENABLED/000-default.conf" ] && [ -f "$SITES_AVAILABLE/000-default.conf" ]; then
-    ln -s "$SITES_AVAILABLE/000-default.conf" "$SITES_ENABLED/000-default.conf"
+if [ ! -L "$SITES_AVAILABLE/000-default.conf" ] || [ "$(readlink -f "$SITES_AVAILABLE/000-default.conf")" != "$ROOT_CONF" ]; then
+    rm -f "$SITES_AVAILABLE/000-default.conf"
+    ln -s "$ROOT_CONF" "$SITES_AVAILABLE/000-default.conf"
+fi
+
+# Link the default config into sites-enabled
+if [ ! -L "$SITES_ENABLED/000-default.conf" ] || [ "$(readlink -f "$SITES_ENABLED/000-default.conf")" != "$ROOT_CONF" ]; then
+    rm -f "$SITES_ENABLED/000-default.conf"
+    ln -s "$ROOT_CONF" "$SITES_ENABLED/000-default.conf"
 fi
 
 export APACHE_RUN_USER=container

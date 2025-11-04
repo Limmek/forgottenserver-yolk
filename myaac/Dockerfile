@@ -45,8 +45,8 @@ WORKDIR /home/container
 USER root
 WORKDIR /home/container
 
-# Expose port 80 (the entrypoint will handle the actual port)
-EXPOSE 80
+# Expose port 8080 (the entrypoint will handle the actual port)
+EXPOSE 8080
 
 # Set the entrypoint to our custom script, which will start Apache
 ENTRYPOINT ["/entrypoint.sh"]
