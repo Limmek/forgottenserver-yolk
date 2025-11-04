@@ -39,8 +39,7 @@ RUN mkdir -p /home/container/myaac \
     && git clone https://github.com/slawkens/myaac.git /home/container/myaac
 WORKDIR /home/container/myaac
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
-    && npm install \
-    && npm run production
+    && npm install
 
 # Switch back to root temporarily to set final permissions
 USER root
