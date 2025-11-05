@@ -11,6 +11,8 @@ WEB_ROOT=${WEB_ROOT:-/home/container/myaac}
 PHP_FPM_UPSTREAM=${PHP_FPM_UPSTREAM:-127.0.0.1:9000}
 NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/home/container/nginx/nginx.conf}
 NGINX_DEFAULT_SERVER=${NGINX_DEFAULT_SERVER:-/home/container/nginx/default.conf}
+NGINX_FASTCGI_PARAMS=${NGINX_FASTCGI_PARAMS:-/home/container/nginx/fastcgi_params}
+NGINX_MIME_TYPES=${NGINX_MIME_TYPES:-/home/container/nginx/mime.types}
 
 # Make internal Docker IP address available to processes.
 if command -v ip >/dev/null 2>&1; then
@@ -24,6 +26,7 @@ export INTERNAL_IP
 export WEB_PORT SERVER_NAME WEB_ROOT PHP_FPM_UPSTREAM
 
 # Prepare runtime directories and log files
+mkdir -p /home/container/.tmp
 mkdir -p /home/container/logs
 mkdir -p /home/container/nginx
 touch /home/container/logs/access.log /home/container/logs/error.log
@@ -47,12 +50,39 @@ fi
 
 # Validate provided Nginx configuration files
 if [ ! -f "${NGINX_CONFIG_PATH}" ]; then
-    echo "ERROR: Expected nginx config at ${NGINX_CONFIG_PATH} but it was not found." >&2
-    exit 1
+    echo "Nginx config ${NGINX_CONFIG_PATH} missing; downloading default copy..."
+    mkdir -p "$(dirname "${NGINX_CONFIG_PATH}")"
+    curl -fSL "https://raw.githubusercontent.com/Limmek/yolks/refs/heads/main/myaac/nginx/nginx.conf" -o "${NGINX_CONFIG_PATH}" || {
+        echo "Failed to download Nginx configuration" >&2
+        exit 1
+    }
 fi
 
 if [ ! -f "${NGINX_DEFAULT_SERVER}" ]; then
-    echo "Warning: Default server block ${NGINX_DEFAULT_SERVER} not found." >&2
+    echo "Nginx default server ${NGINX_DEFAULT_SERVER} missing; downloading default copy..."
+    mkdir -p "$(dirname "${NGINX_DEFAULT_SERVER}")"
+    curl -fSL "https://raw.githubusercontent.com/Limmek/yolks/refs/heads/main/myaac/nginx/default.conf" -o "${NGINX_DEFAULT_SERVER}" || {
+        echo "Failed to download Nginx default server block" >&2
+        exit 1
+    }
+fi
+
+if [ ! -f "${NGINX_FASTCGI_PARAMS}" ]; then
+    echo "Nginx fastcgi_params ${NGINX_FASTCGI_PARAMS} missing; downloading default copy..."
+    mkdir -p "$(dirname "${NGINX_FASTCGI_PARAMS}")"
+    curl -fSL "https://raw.githubusercontent.com/Limmek/yolks/refs/heads/main/myaac/nginx/fastcgi_params" -o "${NGINX_FASTCGI_PARAMS}" || {
+        echo "Failed to download Nginx fastcgi_params" >&2
+        exit 1
+    }
+fi
+
+if [ ! -f "${NGINX_MIME_TYPES}" ]; then
+    echo "Nginx mime.types ${NGINX_MIME_TYPES} missing; downloading default copy..."
+    mkdir -p "$(dirname "${NGINX_MIME_TYPES}")"
+    curl -fSL "https://raw.githubusercontent.com/Limmek/yolks/refs/heads/main/myaac/nginx/mime.types" -o "${NGINX_MIME_TYPES}" || {
+        echo "Failed to download Nginx mime.types" >&2
+        exit 1
+    }
 fi
 
 echo "Using nginx config ${NGINX_CONFIG_PATH}"
