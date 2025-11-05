@@ -3,7 +3,6 @@ set -euo pipefail
 
 cd /home/container
 
-# Ensure frequently used environment variables are initialised
 STARTUP=${STARTUP:-None}
 WEB_PORT=${SERVER_PORT:-8080}
 SERVER_NAME=${SERVER_NAME:-_}
@@ -14,7 +13,6 @@ NGINX_DEFAULT_SERVER=${NGINX_DEFAULT_SERVER:-/home/container/nginx/default.conf}
 NGINX_FASTCGI_PARAMS=${NGINX_FASTCGI_PARAMS:-/home/container/nginx/fastcgi_params}
 NGINX_MIME_TYPES=${NGINX_MIME_TYPES:-/home/container/nginx/mime.types}
 
-# Make internal Docker IP address available to processes.
 if command -v ip >/dev/null 2>&1; then
     INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
 else
@@ -25,13 +23,11 @@ export INTERNAL_IP
 
 export WEB_PORT SERVER_NAME WEB_ROOT PHP_FPM_UPSTREAM
 
-# Prepare runtime directories and log files
 mkdir -p /home/container/.tmp
 mkdir -p /home/container/logs
 mkdir -p /home/container/nginx
 touch /home/container/logs/access.log /home/container/logs/error.log
 
-# Clone and install MyAAC if it doesn't exist yet
 if [ ! -d "${WEB_ROOT}" ]; then
     echo "MyAAC source not found at ${WEB_ROOT}, cloning repository..."
     git clone https://github.com/slawkens/myaac.git "${WEB_ROOT}"
@@ -39,7 +35,6 @@ if [ ! -d "${WEB_ROOT}" ]; then
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
     npm install --production
 
-    # Set permissions based on MyAAC recommendations
     echo "Setting file permissions..."
     chmod 660 images/guilds || true
     chmod 660 images/houses || true
@@ -48,7 +43,6 @@ if [ ! -d "${WEB_ROOT}" ]; then
     cd /home/container
 fi
 
-# Validate provided Nginx configuration files
 if [ ! -f "${NGINX_CONFIG_PATH}" ]; then
     echo "Nginx config ${NGINX_CONFIG_PATH} missing; downloading default copy..."
     mkdir -p "$(dirname "${NGINX_CONFIG_PATH}")"
@@ -110,7 +104,6 @@ start_services() {
 
     trap cleanup EXIT INT TERM
 
-    # Wait for either process to exit, then cascade shutdown
     wait -n "${PHP_FPM_PID}" "${NGINX_PID}"
     exit_code=$?
     wait "${PHP_FPM_PID}" 2>/dev/null || true
@@ -120,7 +113,7 @@ start_services() {
 
 echo "Starting server stack..."
 
-if [ "${STARTUP}" = "None" ]; then
+if [ "${STARTUP}" = "null" ]; then
     start_services
     exit $?
 else

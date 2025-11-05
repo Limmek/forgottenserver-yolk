@@ -1,6 +1,5 @@
 FROM php:8.2-fpm
 
-# Install system dependencies, PHP extensions, and helper tools
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -24,7 +23,6 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create the non-root user and configure PHP-FPM to run as it
 RUN useradd -m -d /home/container -s /bin/bash container \
     && sed -i 's/^user = .*/user = container/' /usr/local/etc/php-fpm.d/www.conf \
     && sed -i 's/^group = .*/group = container/' /usr/local/etc/php-fpm.d/www.conf \
