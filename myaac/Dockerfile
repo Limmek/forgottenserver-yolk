@@ -1,6 +1,6 @@
-FROM php:8.2-apache
+FROM php:8.2-fpm
 
-# Install system dependencies, PHP extensions, and helper tools as root
+# Install system dependencies, PHP extensions, and helper tools
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -12,46 +12,37 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libicu-dev \
     iproute2 \
+    nginx \
     nodejs \
     npm \
-    && rm -rf /var/lib/apt/lists/* \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd zip xml pdo pdo_mysql bcmath intl \
-    && a2enmod rewrite
+    && pecl install apcu \
+    && docker-php-ext-enable apcu
+
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create the non-root user
-RUN useradd -m -d /home/container -s /bin/bash container
+# Create the non-root user and configure PHP-FPM to run as it
+RUN useradd -m -d /home/container -s /bin/bash container \
+    && sed -i 's/^user = .*/user = container/' /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i 's/^group = .*/group = container/' /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i 's|^listen = .*|listen = 127.0.0.1:9000|' /usr/local/etc/php-fpm.d/www.conf
 
-# Set up Apache configuration template and entrypoint as root
-COPY 000-default.conf /etc/apache2/sites-available/default-template.conf
+COPY --chown=container:container nginx/ /home/container/nginx/
 COPY entrypoint.sh /entrypoint.sh
+
 RUN chmod +x /entrypoint.sh \
-    && sed -i \
-    -e 's|IncludeOptional sites-enabled/\*.conf|IncludeOptional /home/container/apache/sites-enabled/\*.conf|' \
-    -e 's|IncludeOptional ports.conf|IncludeOptional /home/container/apache/ports.conf|' \
-    /etc/apache2/apache2.conf
+    && chown container:container /entrypoint.sh \
+    && chown -R container:container /home/container
 
-# Override Apache's default runtime directories
-ENV APACHE_RUN_DIR=/home/container/apache/run
-ENV APACHE_PID_FILE=/home/container/apache/run/apache2.pid
-ENV APACHE_LOCK_DIR=/home/container/apache/run
-ENV APACHE_RUN_USER=container
-ENV APACHE_RUN_GROUP=container
-
-# Switch to the non-root user for all subsequent operations
-USER container
-ENV  USER=container HOME=/home/container
-ENV  NPM_CONFIG_CACHE=/home/container/.npm
+ENV USER=container
+ENV HOME=/home/container
+ENV NPM_CONFIG_CACHE=/home/container/.npm
 WORKDIR /home/container
 
-# Final WORKDIR and user for runtime
-USER root
-WORKDIR /home/container
-
-# Expose port 8080 (the entrypoint will handle the actual port)
 EXPOSE 8080
 
-# Set the entrypoint to our custom script, which will start Apache
 ENTRYPOINT ["/entrypoint.sh"]
 CMD []

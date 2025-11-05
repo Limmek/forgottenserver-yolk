@@ -3,6 +3,15 @@ set -euo pipefail
 
 cd /home/container
 
+# Ensure frequently used environment variables are initialised
+STARTUP=${STARTUP:-None}
+WEB_PORT=${SERVER_PORT:-8080}
+SERVER_NAME=${SERVER_NAME:-_}
+WEB_ROOT=${WEB_ROOT:-/home/container/myaac}
+PHP_FPM_UPSTREAM=${PHP_FPM_UPSTREAM:-127.0.0.1:9000}
+NGINX_CONFIG_PATH=${NGINX_CONFIG_PATH:-/home/container/nginx/nginx.conf}
+NGINX_DEFAULT_SERVER=${NGINX_DEFAULT_SERVER:-/home/container/nginx/default.conf}
+
 # Make internal Docker IP address available to processes.
 if command -v ip >/dev/null 2>&1; then
     INTERNAL_IP=$(ip route get 1 | awk '{print $(NF-2);exit}')
@@ -12,103 +21,80 @@ else
 fi
 export INTERNAL_IP
 
-# Default to port 8080 if SERVER_PORT is not set
-export APACHE_PORT=${SERVER_PORT:-8080}
+export WEB_PORT SERVER_NAME WEB_ROOT PHP_FPM_UPSTREAM
 
-APACHE_BASE_DIR="/home/container/apache"
-ROOT_CONF="${APACHE_BASE_DIR}/000-default.conf"
-PORTS_CONF="${APACHE_BASE_DIR}/ports.conf"
-SITES_AVAILABLE="${APACHE_BASE_DIR}/sites-available"
-SITES_ENABLED="${APACHE_BASE_DIR}/sites-enabled"
-DEFAULT_TEMPLATE="/etc/apache2/sites-available/default-template.conf"
-DEFAULT_PORTS_CONF="/etc/apache2/ports.conf"
+# Prepare runtime directories and log files
+mkdir -p /home/container/logs
+mkdir -p /home/container/nginx
+touch /home/container/logs/access.log /home/container/logs/error.log
 
-
-# Create user-managed config, log, and runtime directories if they don't exist
-mkdir -p "$APACHE_BASE_DIR"
-mkdir -p "$SITES_AVAILABLE"
-mkdir -p "$SITES_ENABLED"
-mkdir -p "/home/container/logs"
-mkdir -p "${APACHE_RUN_DIR}"
-chmod 755 "$SITES_AVAILABLE" "$SITES_ENABLED"
-chmod 755 "${APACHE_RUN_DIR}"
-chmod 755 "/home/container/logs"
-
-# Ensure a writable ports.conf managed from /home/container
-if [ ! -f "$PORTS_CONF" ]; then
-    if [ -f "$DEFAULT_PORTS_CONF" ]; then
-        cp "$DEFAULT_PORTS_CONF" "$PORTS_CONF"
-    fi
-fi
-
-# if grep -qE '^Listen [0-9]+$' "$PORTS_CONF"; then
-#     sed -i "0,/^Listen [0-9]\+$/s//Listen ${APACHE_PORT}/" "$PORTS_CONF"
-# elif grep -qE '^Listen 0\.0\.0\.0:[0-9]+' "$PORTS_CONF"; then
-#     sed -i "0,/^Listen 0\\.0\\.0\\.0:[0-9]\+/{s//Listen 0.0.0.0:${APACHE_PORT}/}" "$PORTS_CONF"
-# elif grep -qE '^Listen \[::\]:[0-9]+' "$PORTS_CONF"; then
-#     sed -i "0,/^Listen \\[::\\]:[0-9]\+/{s//Listen [::]:${APACHE_PORT}/}" "$PORTS_CONF"
-# elif ! grep -qE "^Listen .*${APACHE_PORT}" "$PORTS_CONF"; then
-#     printf 'Listen %s\n' "${APACHE_PORT}" >> "$PORTS_CONF"
-# fi
-
-chmod 644 "$PORTS_CONF" 2>/dev/null || true
-
-# Clone and install MyAAC if it doesn't exist
-if [ ! -d "/home/container/myaac" ]; then
-    echo "MyAAC not found, cloning repository..."
-    git clone https://github.com/slawkens/myaac.git /home/container/myaac
-    cd /home/container/myaac
+# Clone and install MyAAC if it doesn't exist yet
+if [ ! -d "${WEB_ROOT}" ]; then
+    echo "MyAAC source not found at ${WEB_ROOT}, cloning repository..."
+    git clone https://github.com/slawkens/myaac.git "${WEB_ROOT}"
+    cd "${WEB_ROOT}"
     composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
     npm install --production
 
     # Set permissions based on MyAAC recommendations
     echo "Setting file permissions..."
-    chmod 660 images/guilds
-    chmod 660 images/houses
-    chmod 660 images/gallery
-    chmod -R 760 system/cache
-
+    chmod 660 images/guilds || true
+    chmod 660 images/houses || true
+    chmod 660 images/gallery || true
+    chmod -R 760 system/cache || true
     cd /home/container
 fi
 
-# If user-editable config doesn't exist, copy the default template
-# Ensure a user-editable root Apache config exists and is linked
-if [ ! -f "$ROOT_CONF" ]; then
-    echo "Creating default Apache config at $ROOT_CONF"
-    cp "$DEFAULT_TEMPLATE" "$ROOT_CONF"
+# Validate provided Nginx configuration files
+if [ ! -f "${NGINX_CONFIG_PATH}" ]; then
+    echo "ERROR: Expected nginx config at ${NGINX_CONFIG_PATH} but it was not found." >&2
+    exit 1
 fi
 
-if [ ! -L "$SITES_AVAILABLE/000-default.conf" ] || [ "$(readlink -f "$SITES_AVAILABLE/000-default.conf")" != "$ROOT_CONF" ]; then
-    rm -f "$SITES_AVAILABLE/000-default.conf"
-    ln -s "$ROOT_CONF" "$SITES_AVAILABLE/000-default.conf"
+if [ ! -f "${NGINX_DEFAULT_SERVER}" ]; then
+    echo "Warning: Default server block ${NGINX_DEFAULT_SERVER} not found." >&2
 fi
 
-# Link the default config into sites-enabled
-if [ ! -L "$SITES_ENABLED/000-default.conf" ] || [ "$(readlink -f "$SITES_ENABLED/000-default.conf")" != "$ROOT_CONF" ]; then
-    rm -f "$SITES_ENABLED/000-default.conf"
-    ln -s "$ROOT_CONF" "$SITES_ENABLED/000-default.conf"
-fi
+echo "Using nginx config ${NGINX_CONFIG_PATH}"
 
-# sed -i "0,/<VirtualHost \*:[0-9]\+>/{s//<VirtualHost *:${APACHE_PORT}>/}" "$ROOT_CONF"
+PHP_FPM_PID=""
+NGINX_PID=""
 
-echo "Apache will listen on port ${APACHE_PORT}"
+cleanup() {
+    if [ -n "${NGINX_PID}" ] && kill -0 "${NGINX_PID}" >/dev/null 2>&1; then
+        kill "${NGINX_PID}" >/dev/null 2>&1 || true
+    fi
+    if [ -n "${PHP_FPM_PID}" ] && kill -0 "${PHP_FPM_PID}" >/dev/null 2>&1; then
+        kill "${PHP_FPM_PID}" >/dev/null 2>&1 || true
+    fi
+}
 
-export APACHE_RUN_USER=container
-export APACHE_RUN_GROUP=container
+start_services() {
+    echo "Starting php-fpm..."
+    php-fpm --nodaemonize --allow-to-run-as-root &
+    PHP_FPM_PID=$!
 
-echo "Starting server..."
+    echo "Starting nginx..."
+    nginx -c "${NGINX_CONFIG_PATH}" -g "daemon off;" &
+    NGINX_PID=$!
 
-# Check if the startup command is set to "None"
-if [ "${STARTUP}" == "None" ]; then
-    # If STARTUP is "None", use the default command
-    echo "STARTUP is 'None', starting Apache directly."
-    exec apache2-foreground
+    trap cleanup EXIT INT TERM
+
+    # Wait for either process to exit, then cascade shutdown
+    wait -n "${PHP_FPM_PID}" "${NGINX_PID}"
+    exit_code=$?
+    wait "${PHP_FPM_PID}" 2>/dev/null || true
+    wait "${NGINX_PID}" 2>/dev/null || true
+    return "${exit_code}"
+}
+
+echo "Starting server stack..."
+
+if [ "${STARTUP}" = "None" ]; then
+    start_services
+    exit $?
 else
-    # If STARTUP is set to anything else, process and run it.
-    # This allows for Pterodactyl's variable substitution.
     MODIFIED_STARTUP=$(eval echo "$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')")
     echo ":/home/container$ ${MODIFIED_STARTUP}"
-
-    # Execute the custom command
     eval "${MODIFIED_STARTUP}"
 fi
