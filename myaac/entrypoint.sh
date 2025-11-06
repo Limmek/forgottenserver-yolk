@@ -79,6 +79,15 @@ if [ ! -f "${NGINX_MIME_TYPES}" ]; then
     }
 fi
 
+DB_FILE="${WEB_ROOT}/system/database.php"
+if [ -f "${DB_FILE}" ] && ! grep -q "'port' => @\$config\['database_port'\]" "${DB_FILE}"; then
+    echo "Adding missing database port configuration..."
+    sed -i "0,/'host' => \$config\['database_host'\],/s//'host' => \$config['database_host'],\\n\\t\\t'port' => @\$config['database_port'],/" "${DB_FILE}" || true
+fi
+
+sed -i "0,/listen [0-9]\+;/s//listen ${WEB_PORT};/" "${NGINX_DEFAULT_SERVER}" || true
+sed -i "0,/listen \[::\]:[0-9]\+;/s//listen [::]:${WEB_PORT};/" "${NGINX_DEFAULT_SERVER}" || true
+
 echo "Using nginx config ${NGINX_CONFIG_PATH}"
 
 PHP_FPM_PID=""
