@@ -69,9 +69,20 @@ if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
                 
                 if [ "$LOCAL" != "$REMOTE" ]; then
                     echo "Updates found. Pulling changes..."
+                    changed_files=$(git diff --name-only "$LOCAL" "origin/${BRANCH}")
                     git reset --hard origin/${BRANCH}
                     git submodule update --init --recursive
-                    should_rebuild=true
+
+                    if echo "$changed_files" | grep -q '^src/'; then
+                        echo "Changes detected in src/; rebuild required."
+                        should_rebuild=true
+                    else
+                        echo "No changes in src/ detected; skipping rebuild."
+                        if [ ! -f tfs ]; then
+                            echo "TFS binary not found. Building..."
+                            should_rebuild=true
+                        fi
+                    fi
                 else
                     echo "No updates available. TFS is up to date."
                     # Only rebuild if TFS binary doesn't exist
