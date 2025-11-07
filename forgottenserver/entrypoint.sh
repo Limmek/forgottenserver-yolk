@@ -76,8 +76,11 @@ if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
                     if echo "$changed_files" | grep -q '^src/'; then
                         echo "Changes detected in src/; rebuild required."
                         should_rebuild=true
+                    elif echo "$changed_files" | grep -q '^data/'; then
+                        echo "Changes detected in data/; updating data files (no rebuild needed)."
+                        should_rebuild=false
                     else
-                        echo "No changes in src/ detected; skipping rebuild."
+                        echo "No changes in src/ or data/ detected; skipping rebuild."
                         if [ ! -f tfs ]; then
                             echo "TFS binary not found. Building..."
                             should_rebuild=true
