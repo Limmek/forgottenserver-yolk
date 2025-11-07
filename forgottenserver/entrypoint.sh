@@ -155,6 +155,12 @@ if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
         echo "config.lua already exists"
     fi
     
+    # Ensure data directory exists when auto-update is enabled
+    if [ ! -d /home/container/data ] && [ -d .git ]; then
+        echo "Data directory missing; restoring from git..."
+        git checkout HEAD -- data/ 2>/dev/null || echo "No data directory in repository to restore."
+    fi
+    
     echo "Auto-update completed successfully!"
 else
     echo "Auto-update is disabled. Skipping update check."
